@@ -1,4 +1,4 @@
-import WorkflowStreaming from "@/src/components/WorkflowStreaming";
+import WorkflowStreaming from "@/components/WorkflowStreaming";
 
 export default function WorkflowStreamingPage() {
   return (

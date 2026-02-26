@@ -7,32 +7,94 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model User { 
-  id        String    @id @default(cuid()) 
-  email     String    @unique 
-  password String   
-  name      String 
-  role   UserRole @default(USER) 
-  createdAt DateTime  @default(now()) 
-  updatedAt DateTime  @updatedAt 
-  conversations Conversation[]   // リレーション 
-  @@map("users") 
-} 
-enum UserRole { 
-  ADMIN  
+model User {
+  id        String    @id @default(cuid())
+  email     String    @unique
+  password String  
+  name      String
+  role   UserRole @default(USER)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  // リレーション
+  conversations Conversation[]   
+  usageStats    UsageStat[] 
+  stripeCustomer StripeCustomer?
+  subscription  Subscription?
+
+  @@map("users")
+}
+enum UserRole {
+  ADMIN 
   USER 
+  }
+
+model Conversation {
+  id                 String    @id @default(cuid())
+  difyConversationId String   @unique    // Dify APIから返される会話ID
+  userId           String
+  user              User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title               String?
+  totalTokens   Int       @default(0)  // この会話で使用されたトークンの合計
+  totalCost       Float     @default(0)  // この会話のコスト合計
+  createdAt      DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@unique([difyConversationId, userId])
+  @@map("conversations") 
+  }
+
+// 使用状況の追跡
+model UsageStat {
+  id              String           @id @default(cuid())
+  userId          String
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  count           Int              @default(0)
+  tokensUsed      Int              @default(0)
+  period          DateTime  // 使用状況の集計期間 月単位で使用料を追跡 各月の初日
+  createdAt       DateTime         @default(now())
+  @@unique([userId, period])
+  @@map("usage_stats")
 }
 
-model Conversation { 
-  id                 String    @id @default(cuid()) 
-  difyConversationId String   @unique    // Dify APIから返される会話ID 
-  userId           String 
-  user              User @relation(fields: [userId], references: [id], onDelete: Cascade) 
-  title               String? 
-  totalTokens   Int       @default(0)  // この会話で使用されたトークンの合計 
-  totalCost       Float     @default(0)  // この会話のコスト合計 
-  createdAt      DateTime  @default(now()) 
-  updatedAt     DateTime  @updatedAt 
-  @@unique([difyConversationId, userId]) 
-  @@map("conversations")  
+// Stripeカスタマー管理
+model StripeCustomer {
+  id              String     @id @default(cuid())
+  userId          String     @unique
+  user            User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  stripeCustomerId String    @unique
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  @@map("stripe_customers")
+}
+
+// サブスクリプション管理
+model Subscription {
+  id                   String             @id @default(cuid())
+  userId               String             @unique
+  user                 User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  stripeCustomerId     String?
+  stripePriceId        String?
+  stripeSubscriptionId String?            @unique
+  status               SubscriptionStatus @default(ACTIVE)
+  plan                 PlanType           @default(FREE)
+  currentPeriodStart   DateTime?
+  currentPeriodEnd     DateTime?
+  cancelAtPeriodEnd    Boolean            @default(false)
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+  endsAt               DateTime?          // サブスクリプション終了日
+  @@map("subscriptions")
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  CANCELED
+  EXPIRED
+  TRIAL
+  UNPAID
+}
+enum PlanType {
+  FREE
+  PRO
 }

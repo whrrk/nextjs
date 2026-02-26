@@ -1,6 +1,6 @@
 "use client";
-import { Button } from "@/src/components/ui/button";
-import { Textarea } from "@/src/components/ui/textarea";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Card,
   CardContent,
@@ -8,8 +8,8 @@ import {
   CardFooter,
   CardHeader,
   CardTitle,
-} from "@/src/components/ui/card";
-import { useWorkflowStream } from "@/src/hooks/useWorkflowStream";
+} from "@/components/ui/card";
+import { useWorkflowStream } from "@/hooks/useWorkflowStream";
 
 export default function WorkflowStreaming() {
   const { input, setInput, output, callDifyApi } = useWorkflowStream();
