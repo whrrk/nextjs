@@ -1,0 +1,38 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User { 
+  id        String    @id @default(cuid()) 
+  email     String    @unique 
+  password String   
+  name      String 
+  role   UserRole @default(USER) 
+  createdAt DateTime  @default(now()) 
+  updatedAt DateTime  @updatedAt 
+  conversations Conversation[]   // リレーション 
+  @@map("users") 
+} 
+enum UserRole { 
+  ADMIN  
+  USER 
+}
+
+model Conversation { 
+  id                 String    @id @default(cuid()) 
+  difyConversationId String   @unique    // Dify APIから返される会話ID 
+  userId           String 
+  user              User @relation(fields: [userId], references: [id], onDelete: Cascade) 
+  title               String? 
+  totalTokens   Int       @default(0)  // この会話で使用されたトークンの合計 
+  totalCost       Float     @default(0)  // この会話のコスト合計 
+  createdAt      DateTime  @default(now()) 
+  updatedAt     DateTime  @updatedAt 
+  @@unique([difyConversationId, userId]) 
+  @@map("conversations")  
+}

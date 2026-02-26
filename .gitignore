@@ -42,3 +42,4 @@ next-env.d.ts
 
 .vscode
 streamText.txt
+/src/generated/prisma
