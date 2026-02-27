@@ -27,6 +27,7 @@ interface ChatStore {
   setConversationId: (id: string) => void;
   setMessages: (message: Message[]) => void;
   addMessage: (message: Message) => void;
+  updateMessage: (id: string, content: string) => void;
   clearMessage: () => void;
   setConversations: (conversation: Conversation[]) => void;
   setLoading: (loading: boolean) => void;
@@ -50,6 +51,12 @@ export const useChatStore = create<ChatStore>()(
         set((state) => {
           return { messages: [...state.messages, message] };
         }),
+      updateMessage: (id: string, content: string) =>
+        set((state) => ({
+          messages: state.messages.map((message) =>
+            message.id === id ? { ...message, content } : message,
+          ),
+        })),
       clearMessage: () => set({ messages: [] }),
       setConversations: (conversations: Conversation[]) =>
         set({ conversations }),

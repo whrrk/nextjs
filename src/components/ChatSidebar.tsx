@@ -1,5 +1,4 @@
 "use client";
-import type { ChatProps } from "@/types/chat";
 import { useEffect, useState } from "react";
 import { useChatStore } from "@/store/chatStore";
 import type { Conversation } from "@/store/chatStore";
@@ -8,7 +7,7 @@ import Link from "next/link";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-export default function ChatSidebar({ userId }: ChatProps) {
+export default function ChatSidebar() {
   const router = useRouter();
 
   const { setConversations, conversations, conversationId, resetStore } =
@@ -19,7 +18,7 @@ export default function ChatSidebar({ userId }: ChatProps) {
   const fetchConversations = async () => {
     try {
       setIsLoading(true);
-      const response = await fetch(`/api/conversations?userId=${userId}`);
+      const response = await fetch("/api/conversations");
       const data = await response.json();
 
       console.log(data.data);

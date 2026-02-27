@@ -29,14 +29,20 @@ export async function createConversation(
 }
 
 export async function updateConversation(data: ChatFlowType, userId: string) {
-  await prisma.conversation.update({
+  await prisma.conversation.upsert({
     where: {
       difyConversationId_userId: {
         difyConversationId: data.conversation_id,
         userId: userId,
       },
     },
-    data: {
+    update: {
+      totalTokens: data.metadata.usage.total_tokens,
+      totalCost: parseFloat(data.metadata.usage.total_price),
+    },
+    create: {
+      difyConversationId: data.conversation_id,
+      userId: userId,
       totalTokens: data.metadata.usage.total_tokens,
       totalCost: parseFloat(data.metadata.usage.total_price),
     },

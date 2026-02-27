@@ -8,7 +8,6 @@ export default function ChatContainer({
   isNewChat,
   initialMessages,
   conversationId,
-  userId,
 }: ChatContainerProps) {
   const { messages, isLoading, setConversationId, setMessages, clearMessage } =
     useChatStore();
@@ -91,8 +90,8 @@ export default function ChatContainer({
       </div>
 
       {/* 入力エリア */}
-      <div className="flex-shrink-0 border-t py-4">
-        <ChatInput userId={userId} />
+      <div className="shrink-0 border-t py-4">
+        <ChatInput />
       </div>
     </div>
   );

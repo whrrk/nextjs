@@ -1,5 +1,6 @@
 import ChatContainer from "@/components/ChatContainer";
 import { auth } from "@/auth";
+import { getDifyBaseUrl, getDifyChatApiKey } from "@/lib/dify";
 
 type Params = {
   params: Promise<{
@@ -19,24 +20,27 @@ type Message = {
   content: string;
 };
 
-const endpoint = `${process.env.DIFY_API_URL}/messages`;
-const DIFY_API_KEY = process.env.DIFY_API_KEY;
-
 export default async function ChatPage({ params }: Params) {
   const session = await auth();
   const userId = session?.user?.id as string;
 
   const { conversationId } = await params;
   const messages: Message[] = [];
+  const baseUrl = getDifyBaseUrl();
+  const difyApiKey = getDifyChatApiKey();
 
   try {
+    if (!baseUrl || !difyApiKey) {
+      throw new Error("Dify API is not configured");
+    }
+
     const response = await fetch(
-      `${endpoint}?user=${userId}&conversation_id=${conversationId}&limit=100`,
+      `${baseUrl}/messages?user=${userId}&conversation_id=${conversationId}&limit=100`,
       {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${DIFY_API_KEY}`,
+          Authorization: `Bearer ${difyApiKey}`,
         },
         cache: "no-store",
       },
@@ -74,7 +78,6 @@ export default async function ChatPage({ params }: Params) {
       isNewChat={false}
       initialMessages={messages}
       conversationId={conversationId}
-      userId={userId}
     />
   );
 }

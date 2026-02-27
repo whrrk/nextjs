@@ -1,28 +1,50 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
+import { auth } from "@/auth";
+import { getDifyBaseUrl, getDifyChatApiKey } from "@/lib/dify";
 
-const endpoint = `${process.env.DIFY_API_URL}/conversations`;
-const DIFY_API_KEY = process.env.DIFY_API_KEY;
-
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
-    const searchParams = request.nextUrl.searchParams;
-    const userId = searchParams.get("userId");
+    const session = await auth();
+    const userId = session?.user?.id;
+
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const baseUrl = getDifyBaseUrl();
+    const difyApiKey = getDifyChatApiKey();
+
+    if (!baseUrl || !difyApiKey) {
+      return NextResponse.json(
+        { error: "Dify API is not configured" },
+        { status: 500 },
+      );
+    }
 
     // DifyワークフローAPI接続
-    const response = await fetch(`${endpoint}?user=${userId}&limit=50`, {
+    const response = await fetch(`${baseUrl}/conversations?user=${userId}&limit=50`, {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${DIFY_API_KEY}`,
+        Authorization: `Bearer ${difyApiKey}`,
       },
     });
 
     const data = await response.json();
-    console.log(data);
+
+    if (!response.ok) {
+      return NextResponse.json(
+        { error: data?.message || "Dify request failed" },
+        { status: response.status },
+      );
+    }
 
     return NextResponse.json(data);
   } catch (error) {
     console.error("APIエラー", error);
-    return NextResponse.json("Dify側でエラーが発生しました");
+    return NextResponse.json(
+      { error: "Dify側でエラーが発生しました" },
+      { status: 500 },
+    );
   }
 }

@@ -1,30 +1,38 @@
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import type { ChatProps } from "@/types/chat";
 import { useState } from "react";
 import { useChatStore } from "@/store/chatStore";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Toaster } from "@/components/ui/sonner";
 
-export default function ChatInput({ userId }: ChatProps) {
+export default function ChatInput() {
   const [input, setInput] = useState("");
   const router = useRouter();
 
-  const { conversationId, setConversationId, addMessage, setLoading } =
+  const { conversationId, setConversationId, addMessage, updateMessage, setLoading } =
     useChatStore();
 
-  const callDifyApi = async (e: React.FormEvent) => {
+  const callDifyApi = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
-    if (!input.trim()) return;
+    const query = input.trim();
+    if (!query) return;
 
     try {
       setLoading(true);
 
       addMessage({
         role: "user",
-        content: input,
+        content: query,
+      });
+      setInput("");
+
+      const assistantMessageId = `assistant-temp-${Date.now()}`;
+      addMessage({
+        id: assistantMessageId,
+        role: "assistant",
+        content: "",
       });
 
       const response = await fetch("/api/chat", {
@@ -33,15 +41,17 @@ export default function ChatInput({ userId }: ChatProps) {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          query: input,
-          userId: userId,
+          query,
           conversationId: conversationId,
         }),
       });
 
-      const result = await response.json();
-
       if (!response.ok) {
+        const result = await response.json().catch(() => ({}));
+        const message =
+          result?.error ||
+          result?.message ||
+          "リクエストの処理中にエラーが発生しました。";
         if (response.status === 403) {
           toast("利用制限に達しました", {
             description:
@@ -49,26 +59,139 @@ export default function ChatInput({ userId }: ChatProps) {
           });
         } else {
           toast("エラーが発生しました", {
-            description: "リクエストの処理中にエラーが発生しました。",
+            description: message,
           });
+        }
+        console.error("chat api error:", response.status, result);
+        updateMessage(assistantMessageId, "エラーが発生しました。");
+        setInput(query);
+        return;
+      }
+
+      const contentType = response.headers.get("content-type") || "";
+
+      // Fallback: proxy/environment may collapse stream into a single JSON response.
+      if (contentType.includes("application/json")) {
+        const result = await response.json().catch(() => ({}));
+        const answer =
+          typeof result?.answer === "string"
+            ? result.answer
+            : typeof result?.data?.answer === "string"
+              ? result.data.answer
+              : "";
+        if (answer) {
+          updateMessage(assistantMessageId, answer);
+        } else {
+          updateMessage(
+            assistantMessageId,
+            "응답 포맷을 해석하지 못했습니다. 네트워크 응답 본문을 확인해주세요.",
+          );
+        }
+
+        const resolvedConversationId =
+          typeof result?.conversation_id === "string"
+            ? result.conversation_id
+            : typeof result?.data?.conversation_id === "string"
+              ? result.data.conversation_id
+              : conversationId;
+
+        if (resolvedConversationId && !conversationId) {
+          setConversationId(resolvedConversationId);
+          router.replace(`/chat/${resolvedConversationId}`);
+        } else {
+          router.refresh();
         }
         return;
       }
 
-      // 会話IDがセットされていなければ設定
-      if (!conversationId) {
-        setConversationId(result.conversation_id);
-        router.push(`chat/${result.conversation_id}`);
+      if (!response.body) {
+        updateMessage(assistantMessageId, "空のレスポンスを受信しました。");
+        setInput(query);
+        return;
       }
 
-      // Dify APIの応答をストアに追加
-      addMessage({
-        id: result.message_id,
-        role: "assistant",
-        content: result.answer,
-      });
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let fullAnswer = "";
+      let nextConversationId = conversationId;
+      let isCompleted = false;
+      let hasAnyChunk = false;
 
-      setInput("");
+      while (!isCompleted) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+
+        let separatorIndex = buffer.search(/\r?\n\r?\n/);
+        while (separatorIndex !== -1) {
+          const rawEvent = buffer.slice(0, separatorIndex);
+          const matchedSeparator = buffer
+            .slice(separatorIndex)
+            .match(/^\r?\n\r?\n/);
+          const separatorLength = matchedSeparator?.[0]?.length ?? 2;
+          buffer = buffer.slice(separatorIndex + separatorLength);
+
+          const data = rawEvent
+            .split(/\r?\n/)
+            .filter((line) => line.startsWith("data:"))
+            .map((line) => line.slice(5).trimStart())
+            .join("\n");
+
+          if (data && data !== "[DONE]") {
+            try {
+              const payload = JSON.parse(data);
+              hasAnyChunk = true;
+              if (
+                typeof payload?.conversation_id === "string" &&
+                payload.conversation_id
+              ) {
+                nextConversationId = payload.conversation_id;
+              } else if (
+                typeof payload?.data?.conversation_id === "string" &&
+                payload.data.conversation_id
+              ) {
+                nextConversationId = payload.data.conversation_id;
+              }
+              const answerChunk =
+                typeof payload?.answer === "string"
+                  ? payload.answer
+                  : typeof payload?.data?.answer === "string"
+                    ? payload.data.answer
+                    : "";
+              if (answerChunk) {
+                fullAnswer += answerChunk;
+                updateMessage(assistantMessageId, fullAnswer);
+              }
+              if (
+                payload?.event === "message_end" ||
+                payload?.event === "agent_message_end"
+              ) {
+                isCompleted = true;
+                await reader.cancel();
+                break;
+              }
+            } catch {
+              // ignore invalid chunks
+            }
+          }
+
+          separatorIndex = buffer.search(/\r?\n\r?\n/);
+        }
+      }
+
+      if (!hasAnyChunk) {
+        updateMessage(
+          assistantMessageId,
+          "응답 스트림을 수신하지 못했습니다. 네트워크/프록시 설정을 확인해주세요.",
+        );
+      }
+
+      if (nextConversationId && !conversationId) {
+        setConversationId(nextConversationId);
+        router.replace(`/chat/${nextConversationId}`);
+      }
     } catch (error) {
       console.error("API接続に失敗", error);
     } finally {
@@ -78,17 +201,19 @@ export default function ChatInput({ userId }: ChatProps) {
 
   return (
     <div>
-      <form className="flex flex-col gap-2 px-4 max-w-4xl mx-auto w-full">
+      <form
+        onSubmit={callDifyApi}
+        className="flex flex-col gap-2 px-4 max-w-4xl mx-auto w-full"
+      >
         <div className="flex items-center gap-2">
           <Textarea
-            className="flex-1 min-h-[60px] max-h-[200px] text-sm md:text-base bg-white resize-none"
+            className="flex-1 min-h-15 max-h-50 text-sm md:text-base bg-white resize-none"
             placeholder="メッセージを入力してください"
             value={input}
             onChange={(e) => setInput(e.target.value)}
           ></Textarea>
           <Button
             type="submit"
-            onClick={callDifyApi}
             className="h-10 px-4 shrink-0"
           >
             送信
