@@ -1,6 +1,6 @@
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useChatStore } from "@/store/chatStore";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -8,6 +8,7 @@ import { Toaster } from "@/components/ui/sonner";
 
 export default function ChatInput() {
   const [input, setInput] = useState("");
+  const formRef = useRef<HTMLFormElement>(null);
   const router = useRouter();
 
   const { conversationId, setConversationId, addMessage, updateMessage, setLoading } =
@@ -202,19 +203,30 @@ export default function ChatInput() {
   return (
     <div>
       <form
+        ref={formRef}
         onSubmit={callDifyApi}
-        className="flex flex-col gap-2 px-4 max-w-4xl mx-auto w-full"
+        className="mx-auto flex w-full max-w-4xl flex-col gap-2 px-4"
       >
         <div className="flex items-center gap-2">
           <Textarea
-            className="flex-1 min-h-15 max-h-50 text-sm md:text-base bg-white resize-none"
+            className="min-h-15 max-h-50 flex-1 resize-none rounded-xl border-slate-300 bg-slate-50 text-sm md:text-base"
             placeholder="メッセージを入力してください"
             value={input}
             onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (
+                e.key === "Enter" &&
+                !e.shiftKey &&
+                !e.nativeEvent.isComposing
+              ) {
+                e.preventDefault();
+                formRef.current?.requestSubmit();
+              }
+            }}
           ></Textarea>
           <Button
             type="submit"
-            className="h-10 px-4 shrink-0"
+            className="h-10 shrink-0 bg-slate-900 px-4 text-white shadow-sm hover:bg-slate-700"
           >
             送信
           </Button>

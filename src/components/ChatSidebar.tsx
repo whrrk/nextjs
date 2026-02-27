@@ -51,14 +51,19 @@ export default function ChatSidebar() {
   return (
     <div className="flex flex-col h-full">
       <div className="px-4 py-4">
-        <Button onClick={handleNewChat} className="bg-indigo-700 w-full">
+        <Button
+          onClick={handleNewChat}
+          className="w-full bg-slate-900 text-white shadow-sm hover:bg-slate-700"
+        >
           <Plus size={16} />
           <span>新規チャット</span>
         </Button>
       </div>
       <div className="flex-1 overflow-y-auto px-2 pb-4">
         <div className="flex justify-between items-center px-2 mb-2">
-          <h3 className="text-sm font-medium">会話履歴</h3>
+          <h3 className="text-xs font-semibold tracking-wide text-slate-500 uppercase">
+            会話履歴
+          </h3>
         </div>
         {isLoading && conversations.length === 0 ? (
           <div className="text-center py-4 text-gray-500">読み込み中...</div>
@@ -73,8 +78,8 @@ export default function ChatSidebar() {
                 <Link
                   href={`/chat/${conversation.id}`}
                   className={`
-                    flex items-center p-2 my-2 text-sm rounded-lg hover:bg-slate-200
-                    ${conversationId === conversation.id ? "bg-slate-200" : ""}`}
+                    my-1 flex items-center rounded-md border border-transparent p-2 text-sm text-slate-700 transition-colors hover:bg-slate-100
+                    ${conversationId === conversation.id ? "border-slate-200 bg-slate-100 text-slate-900" : ""}`}
                 >
                   <div className="flex-1">
                     <p className="truncate font-medium">{conversation.name}</p>
